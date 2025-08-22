@@ -1,7 +1,49 @@
-// Mock AI Service for STLC Assistant
-// Simulates Azure OpenAI responses with intelligent, context-aware mock data
+// AI Service for STLC Assistant
+// Integrates real Azure OpenAI with fallback to mock data
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Azure OpenAI Service Configuration
+const getAzureConfig = () => {
+  try {
+    const config = sessionStorage.getItem('azure-openai-config');
+    return config ? JSON.parse(config) : null;
+  } catch (error) {
+    console.error('Error loading Azure config:', error);
+    return null;
+  }
+};
+
+const callAzureOpenAI = async (messages, maxTokens = 3000) => {
+  const config = getAzureConfig();
+  if (!config) {
+    throw new Error('No Azure config found');
+  }
+
+  const response = await fetch(`${config.endpoint}/openai/deployments/${config.deploymentName}/chat/completions?api-version=${config.apiVersion}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': config.apiKey
+    },
+    body: JSON.stringify({
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.7,
+      top_p: 0.95,
+      frequency_penalty: 0,
+      presence_penalty: 0
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Azure OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
+};
 
 const mockRequirements = [
   {
@@ -125,9 +167,51 @@ const mockBusinessDrivers = [
 export const aiService = {
   // Phase 1: Requirements Analysis
   async analyzeRequirements(fileContent, businessContext = '') {
-    await delay(2000); // Simulate AI processing time
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        // Use Azure OpenAI
+        const prompt = `You are a requirements analysis expert. Analyze the following requirements document and provide a comprehensive analysis in JSON format.
 
-    // Simulate intelligent analysis based on content
+Requirements Document Content:
+${fileContent}
+
+Business Context:
+${businessContext}
+
+Please provide a detailed analysis including:
+1. Extracted requirements with structured format (id, title, description, type, priority, category, acceptance_criteria, business_value, complexity, risk_level)
+2. Quality metrics (total_requirements, functional_count, non_functional_count, quality_score, completeness_score, clarity_score, testability_score)
+3. Validation results (errors, warnings, suggestions)
+4. Identified stakeholders
+5. Business drivers
+6. Estimated effort (development_weeks, testing_weeks, total_story_points)
+7. Risk assessment (high_risk_count, medium_risk_count, low_risk_count)
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert requirements analyst. Provide detailed, structured analysis in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 4000);
+        console.log('Azure OpenAI requirements analysis response received');
+        
+        // Parse and return the response
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing Azure OpenAI response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock data
+    await delay(2000);
     const analysis = {
       requirements: mockRequirements,
       quality_metrics: {
@@ -183,8 +267,43 @@ export const aiService = {
   },
 
   async validateRequirement(requirement) {
-    await delay(800);
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        const prompt = `You are a requirements validation expert. Analyze the following requirement and provide validation feedback in JSON format.
 
+Requirement:
+${JSON.stringify(requirement, null, 2)}
+
+Please provide:
+1. is_valid (boolean)
+2. quality_score (0-100)
+3. suggestions (array of specific suggestions)
+4. improvements (array of specific improvements)
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert at validating requirements. Provide structured feedback in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 1000);
+        console.log('Azure OpenAI requirement validation response received');
+        
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing validation response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI validation failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock data
+    await delay(800);
     const suggestions = [
       'Consider adding specific error handling scenarios',
       'Define clear success and failure criteria',
@@ -207,6 +326,49 @@ export const aiService = {
 
   // Phase 2: Test Planning
   async generateTestPlan(projectInfo) {
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        const prompt = `You are a test planning expert. Generate a comprehensive test plan based on the following project information in JSON format.
+
+Project Information:
+${JSON.stringify(projectInfo, null, 2)}
+
+Please provide a detailed test plan including:
+1. objective (string)
+2. scope (object with inclusions and exclusions arrays)
+3. approach (object with strategy, methodology, and phases)
+4. test_types (array)
+5. environment (object with test_environments, tools, infrastructure)
+6. resources (object with team_size, roles, duration, effort)
+7. schedule (object with phases array containing name, duration, start)
+8. risks (array with risk, impact, probability, mitigation)
+9. tools (object with various tool categories)
+10. deliverables (array)
+11. success_criteria (array)
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert test planning specialist. Generate comprehensive test plans in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 4000);
+        console.log('Azure OpenAI test plan response received');
+        
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing test plan response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI test plan generation failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock data
     await delay(3000);
 
     return {
@@ -319,6 +481,49 @@ export const aiService = {
 
   // Phase 3: Test Case Development
   async generateTestCases(requirements, configuration) {
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        const prompt = `You are a test case generation expert. Generate comprehensive test cases based on the following requirements and configuration in JSON format.
+
+Requirements:
+${JSON.stringify(requirements, null, 2)}
+
+Configuration:
+${JSON.stringify(configuration, null, 2)}
+
+Please provide:
+1. test_cases (array of test case objects with: id, title, description, requirement_id, type, priority, category, test_type, preconditions, steps, expected_result, test_data, tags, estimated_time, status, created_date, automated)
+2. summary (object with total_generated, by_type, by_priority, estimated_total_time, automation_candidates)
+3. recommendations (array of strings)
+
+Generate test cases based on configuration settings:
+- includePositive: generate positive test cases
+- includeNegative: generate negative test cases  
+- includeBoundary: generate boundary test cases
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert test case generator. Create comprehensive test cases in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 4000);
+        console.log('Azure OpenAI test case generation response received');
+        
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing test case response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI test case generation failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock data
     await delay(2500);
 
     const testCases = [];
@@ -494,6 +699,42 @@ export const aiService = {
   },
 
   async optimizeTestCase(testCase) {
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        const prompt = `You are a test case optimization expert. Optimize the following test case and provide improvement suggestions in JSON format.
+
+Test Case:
+${JSON.stringify(testCase, null, 2)}
+
+Please provide:
+1. optimized_steps (array of improved test steps)
+2. suggestions (array of specific optimization suggestions)
+3. automation_potential (string: High/Medium/Low)
+4. estimated_time_reduction (string with percentage)
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert test case optimizer. Provide optimization suggestions in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 1000);
+        console.log('Azure OpenAI test case optimization response received');
+        
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing optimization response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI optimization failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock data
     await delay(1000);
 
     return {

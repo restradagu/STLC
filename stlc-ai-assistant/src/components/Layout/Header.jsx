@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bell, Settings, User, Download } from 'lucide-react';
+import AzureConfigModal from '../common/AzureConfigModal';
 
 const Header = ({ currentPhase, projectData }) => {
+  const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const getPhaseTitle = (phase) => {
     const titles = {
       dashboard: 'Project Dashboard',
@@ -53,7 +55,11 @@ const Header = ({ currentPhase, projectData }) => {
             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
               <Download className="w-5 h-5 text-gray-600" />
             </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <button 
+              onClick={() => setIsConfigModalOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Azure OpenAI Configuration"
+            >
               <Settings className="w-5 h-5 text-gray-600" />
             </button>
             <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -62,6 +68,11 @@ const Header = ({ currentPhase, projectData }) => {
           </div>
         </div>
       </div>
+
+      <AzureConfigModal 
+        isOpen={isConfigModalOpen} 
+        onClose={() => setIsConfigModalOpen(false)} 
+      />
     </header>
   );
 };
