@@ -21,11 +21,15 @@ body {
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-primary-600 hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 focus:outline-none text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gray-200 hover:bg-gray-300 focus:ring-4 focus:ring-gray-100 focus:outline-none text-gray-800 font-medium py-2 px-4 rounded-lg transition-all duration-200;
+  }
+  
+  .btn-outline {
+    @apply border border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-4 focus:ring-primary-200 focus:outline-none font-medium py-2 px-4 rounded-lg transition-all duration-200;
   }
   
   .card {
@@ -33,10 +37,22 @@ body {
   }
   
   .sidebar-item {
-    @apply flex items-center px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-200 cursor-pointer;
+    @apply flex items-center px-4 py-3 text-gray-700 hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:text-primary-700 focus:outline-none transition-colors duration-200 cursor-pointer;
   }
   
   .sidebar-item.active {
     @apply bg-primary-100 text-primary-800 border-r-4 border-primary-600;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-4 focus:ring-primary-200 focus:border-primary-600 focus:outline-none transition-all duration-200;
+  }
+  
+  .input-field:invalid {
+    @apply border-red-300 focus:ring-red-200 focus:border-red-600;
+  }
+  
+  .tooltip {
+    @apply relative inline-block;
   }
 }

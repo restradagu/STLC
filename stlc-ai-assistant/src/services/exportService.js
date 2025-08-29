@@ -1,4 +1,7 @@
 import jsPDF from 'jspdf';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import * as ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export const exportService = {
   // Export to JSON format
@@ -563,6 +566,488 @@ export const exportService = {
       return { success: true };
     } catch (error) {
       console.error('Word export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Enhanced Test Plan Export Functions
+  exportTestPlanToWord: async (testPlan, projectName = 'STLC Project') => {
+    try {
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Test Plan Document",
+                  bold: true,
+                  size: 32,
+                })
+              ],
+              heading: HeadingLevel.TITLE,
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Project: ${projectName}`,
+                  bold: true,
+                })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Generated: ${new Date().toLocaleDateString()}`,
+                })
+              ]
+            }),
+            new Paragraph({ text: "" }),
+
+            // Objective Section
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Objective",
+                  bold: true,
+                  size: 24,
+                })
+              ],
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: testPlan.objective || "Not specified",
+                })
+              ]
+            }),
+            new Paragraph({ text: "" }),
+
+            // Scope Section
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Scope",
+                  bold: true,
+                  size: 24,
+                })
+              ],
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Inclusions:",
+                  bold: true,
+                })
+              ]
+            }),
+            ...(testPlan.scope?.inclusions || []).map(item => 
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `• ${item}` })
+                ]
+              })
+            ),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Exclusions:",
+                  bold: true,
+                })
+              ]
+            }),
+            ...(testPlan.scope?.exclusions || []).map(item => 
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `• ${item}` })
+                ]
+              })
+            ),
+            new Paragraph({ text: "" }),
+
+            // Test Types
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Test Types",
+                  bold: true,
+                  size: 24,
+                })
+              ],
+              heading: HeadingLevel.HEADING_1,
+            }),
+            ...(testPlan.test_types || []).map(type => 
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `• ${type}` })
+                ]
+              })
+            ),
+            new Paragraph({ text: "" }),
+
+            // Resources
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "Resources",
+                  bold: true,
+                  size: 24,
+                })
+              ],
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Team Size: ${testPlan.resources?.team_size || 'Not specified'}` })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Duration: ${testPlan.resources?.duration || 'Not specified'}` })
+              ]
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `Effort: ${testPlan.resources?.effort || 'Not specified'}` })
+              ]
+            }),
+          ]
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      const filename = `TestPlan_${projectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Word export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  exportTestPlanToPDF: (testPlan, projectName = 'STLC Project') => {
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.width;
+      const margin = 20;
+      let currentY = margin;
+
+      // Helper functions
+      const addText = (text, x, y, maxWidth, fontSize = 10) => {
+        pdf.setFontSize(fontSize);
+        const lines = pdf.splitTextToSize(text, maxWidth);
+        pdf.text(lines, x, y);
+        return y + (lines.length * fontSize * 0.4);
+      };
+
+      const checkPageOverflow = (nextY, lineHeight = 20) => {
+        if (nextY + lineHeight > pdf.internal.pageSize.height - margin) {
+          pdf.addPage();
+          return margin;
+        }
+        return nextY;
+      };
+
+      // Header
+      pdf.setFontSize(20);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Test Plan Document', margin, currentY);
+      currentY += 20;
+
+      pdf.setFontSize(12);
+      pdf.setFont(undefined, 'normal');
+      currentY = addText(`Project: ${projectName}`, margin, currentY, pageWidth - 2 * margin, 12);
+      currentY = addText(`Generated: ${new Date().toLocaleDateString()}`, margin, currentY + 5, pageWidth - 2 * margin, 12);
+      currentY += 20;
+
+      // Objective
+      if (testPlan.objective) {
+        currentY = checkPageOverflow(currentY);
+        pdf.setFontSize(16);
+        pdf.setFont(undefined, 'bold');
+        pdf.text('Objective', margin, currentY);
+        currentY += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'normal');
+        currentY = addText(testPlan.objective, margin, currentY, pageWidth - 2 * margin);
+        currentY += 15;
+      }
+
+      // Test Types
+      if (testPlan.test_types) {
+        currentY = checkPageOverflow(currentY);
+        pdf.setFontSize(16);
+        pdf.setFont(undefined, 'bold');
+        pdf.text('Test Types', margin, currentY);
+        currentY += 10;
+
+        pdf.setFontSize(10);
+        pdf.setFont(undefined, 'normal');
+        testPlan.test_types.forEach(type => {
+          currentY = addText(`• ${type}`, margin, currentY, pageWidth - 2 * margin);
+          currentY += 3;
+        });
+        currentY += 10;
+      }
+
+      const filename = `TestPlan_${projectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(filename);
+      return { success: true };
+    } catch (error) {
+      console.error('PDF export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  exportTestPlanToTxt: (testPlan, projectName = 'STLC Project') => {
+    try {
+      let content = '';
+      content += '='.repeat(50) + '\n';
+      content += '           TEST PLAN DOCUMENT\n';
+      content += '='.repeat(50) + '\n\n';
+      
+      content += `Project: ${projectName}\n`;
+      content += `Generated: ${new Date().toLocaleDateString()}\n\n`;
+
+      if (testPlan.objective) {
+        content += 'OBJECTIVE:\n';
+        content += '-'.repeat(20) + '\n';
+        content += testPlan.objective + '\n\n';
+      }
+
+      if (testPlan.scope) {
+        content += 'SCOPE:\n';
+        content += '-'.repeat(20) + '\n';
+        content += 'Inclusions:\n';
+        testPlan.scope.inclusions?.forEach(item => {
+          content += `• ${item}\n`;
+        });
+        content += '\nExclusions:\n';
+        testPlan.scope.exclusions?.forEach(item => {
+          content += `• ${item}\n`;
+        });
+        content += '\n';
+      }
+
+      if (testPlan.test_types) {
+        content += 'TEST TYPES:\n';
+        content += '-'.repeat(20) + '\n';
+        testPlan.test_types.forEach(type => {
+          content += `• ${type}\n`;
+        });
+        content += '\n';
+      }
+
+      if (testPlan.resources) {
+        content += 'RESOURCES:\n';
+        content += '-'.repeat(20) + '\n';
+        content += `Team Size: ${testPlan.resources.team_size}\n`;
+        content += `Duration: ${testPlan.resources.duration}\n`;
+        content += `Effort: ${testPlan.resources.effort}\n\n`;
+      }
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const filename = `TestPlan_${projectName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('TXT export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Enhanced Test Cases Export Functions
+  exportTestCasesToExcel: async (testCasesData, projectName = 'STLC Project') => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Test Cases');
+
+      // Header row
+      const headers = [
+        'ID', 'Title', 'Description', 'Type', 'Priority', 
+        'Preconditions', 'Test Steps', 'Expected Result', 'Tags'
+      ];
+      
+      worksheet.addRow(headers);
+      
+      // Style header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF366092' }
+      };
+
+      // Add data rows
+      testCasesData.testCases?.forEach(testCase => {
+        const steps = testCase.steps?.map((step, index) => 
+          `${index + 1}. Action: ${step.action}\n   Expected: ${step.expected}`
+        ).join('\n') || '';
+
+        worksheet.addRow([
+          testCase.id,
+          testCase.title,
+          testCase.description,
+          testCase.type,
+          testCase.priority,
+          testCase.preconditions?.join(', ') || '',
+          steps,
+          testCase.expected_result,
+          testCase.tags?.join(', ') || ''
+        ]);
+      });
+
+      // Auto-fit columns
+      worksheet.columns.forEach(column => {
+        column.width = 20;
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      
+      const filename = `TestCases_${projectName.replace(/\s+/g, '_')}_Excel_${new Date().toISOString().split('T')[0]}.xlsx`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Excel export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  exportTestCasesToAzureCSV: (testCasesData, projectName = 'STLC Project') => {
+    try {
+      const headers = [
+        'ID', 'Work Item Type', 'Title', 'Description', 'Area Path', 'Iteration Path',
+        'Priority', 'State', 'Assigned To', 'Test Suite', 'Steps', 'Expected Results'
+      ];
+
+      let csvContent = headers.join(',') + '\n';
+      
+      testCasesData.testCases?.forEach(testCase => {
+        const steps = testCase.steps?.map((step, index) => 
+          `Step ${index + 1}: ${step.action.replace(/,/g, ';')}`
+        ).join('|') || '';
+
+        const expectedResults = testCase.steps?.map((step, index) => 
+          `Step ${index + 1}: ${step.expected.replace(/,/g, ';')}`
+        ).join('|') || '';
+
+        const row = [
+          testCase.id,
+          'Test Case',
+          `"${testCase.title.replace(/"/g, '""')}"`,
+          `"${testCase.description.replace(/"/g, '""')}"`,
+          projectName,
+          'Current',
+          testCase.priority === 'high' ? '1' : testCase.priority === 'medium' ? '2' : '3',
+          'Design',
+          '',
+          'Default Suite',
+          `"${steps}"`,
+          `"${expectedResults}"`
+        ];
+        
+        csvContent += row.join(',') + '\n';
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const filename = `TestCases_${projectName.replace(/\s+/g, '_')}_AzureTestPlan_${new Date().toISOString().split('T')[0]}.csv`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Azure CSV export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  exportTestCasesToTestLinkCSV: (testCasesData, projectName = 'STLC Project') => {
+    try {
+      const headers = [
+        'TestCase ID', 'TestCase Name', 'Summary', 'Preconditions', 'Action', 'Expected Result',
+        'Keywords', 'Priority', 'Type', 'Execution'
+      ];
+
+      let csvContent = headers.join(',') + '\n';
+      
+      testCasesData.testCases?.forEach(testCase => {
+        const actions = testCase.steps?.map(step => step.action.replace(/,/g, ';')).join('|') || '';
+        const expectedResults = testCase.steps?.map(step => step.expected.replace(/,/g, ';')).join('|') || '';
+
+        const row = [
+          testCase.id,
+          `"${testCase.title.replace(/"/g, '""')}"`,
+          `"${testCase.description.replace(/"/g, '""')}"`,
+          `"${testCase.preconditions?.join('; ') || ''}"`,
+          `"${actions}"`,
+          `"${expectedResults}"`,
+          testCase.tags?.join(';') || '',
+          testCase.priority.toUpperCase(),
+          testCase.type.toUpperCase(),
+          'MANUAL'
+        ];
+        
+        csvContent += row.join(',') + '\n';
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const filename = `TestCases_${projectName.replace(/\s+/g, '_')}_TestLink_${new Date().toISOString().split('T')[0]}.csv`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('TestLink CSV export error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  exportTestCasesToZephyrCSV: (testCasesData, projectName = 'STLC Project') => {
+    try {
+      const headers = [
+        'Name', 'Description', 'Priority', 'Component', 'Labels', 'Steps', 'Test Result', 'Test Data'
+      ];
+
+      let csvContent = headers.join(',') + '\n';
+      
+      testCasesData.testCases?.forEach(testCase => {
+        const steps = testCase.steps?.map((step, index) => 
+          `${index + 1}. ${step.action} | Expected: ${step.expected}`
+        ).join('\n').replace(/,/g, ';') || '';
+
+        const row = [
+          `"${testCase.title.replace(/"/g, '""')}"`,
+          `"${testCase.description.replace(/"/g, '""')}"`,
+          testCase.priority.charAt(0).toUpperCase() + testCase.priority.slice(1),
+          projectName.replace(/,/g, ';'),
+          testCase.tags?.join(';') || '',
+          `"${steps}"`,
+          'Not Executed',
+          ''
+        ];
+        
+        csvContent += row.join(',') + '\n';
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const filename = `TestCases_${projectName.replace(/\s+/g, '_')}_ZephyrJira_${new Date().toISOString().split('T')[0]}.csv`;
+      saveAs(blob, filename);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Zephyr CSV export error:', error);
       return { success: false, error: error.message };
     }
   }

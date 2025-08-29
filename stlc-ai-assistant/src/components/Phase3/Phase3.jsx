@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import aiService from '../../services/aiService';
+import exportService from '../../services/exportService';
 import TestCaseConfiguration from './TestCaseConfiguration';
 import TestCaseTable from './TestCaseTable';
+import TestCaseEditModal from './TestCaseEditModal';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { 
   TestTube, 
@@ -11,14 +13,20 @@ import {
   CheckCircle,
   ArrowLeft,
   Download,
-  BarChart3
+  BarChart3,
+  ChevronDown
 } from 'lucide-react';
 
 const Phase3 = () => {
   const { state, actions } = useApp();
-  const [currentStep, setCurrentStep] = useState('configure'); // configure, generate, manage
+  const [currentStep, setCurrentStep] = useState('configure'); // configure, select, generate, manage
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationResults, setGenerationResults] = useState(null);
+  const [, setGenerationResults] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTestCase, setEditingTestCase] = useState(null);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [selectedRequirements, setSelectedRequirements] = useState([]);
+  const [configurationData, setConfigurationData] = useState(null);
 
   const phaseData = state.phases.testcases.data;
   const requirementsData = state.phases.requirements.data;
@@ -31,14 +39,30 @@ const Phase3 = () => {
   }, [phaseData.testCases]);
 
   const handleConfigurationComplete = async (config) => {
+    setConfigurationData(config);
+    // Initialize all requirements as selected
+    setSelectedRequirements(requirementsData.requirements?.map(req => req.id) || []);
+    setCurrentStep('select');
+  };
+
+  const handleRequirementSelection = async () => {
+    const filteredRequirements = requirementsData.requirements?.filter(req => 
+      selectedRequirements.includes(req.id)
+    ) || [];
+
+    if (filteredRequirements.length === 0) {
+      actions.addError('Please select at least one requirement to generate test cases.');
+      return;
+    }
+
     setIsGenerating(true);
     setCurrentStep('generate');
 
     try {
-      // Generate test cases with AI
+      // Generate test cases with AI using only selected requirements
       const results = await aiService.generateTestCases(
-        requirementsData.requirements || [],
-        config
+        filteredRequirements,
+        configurationData
       );
       
       setGenerationResults(results);
@@ -46,7 +70,8 @@ const Phase3 = () => {
       // Update app state
       actions.updatePhaseData('testcases', {
         testCases: results.test_cases,
-        configuration: config,
+        configuration: configurationData,
+        selectedRequirements: selectedRequirements,
         statistics: {
           total: results.test_cases.length,
           byPriority: {
@@ -73,69 +98,179 @@ const Phase3 = () => {
       actions.updatePhaseProgress('testcases', 100);
       
       setCurrentStep('manage');
-      actions.addNotification('success', `Generated ${results.test_cases.length} test cases successfully!`);
+      actions.addNotification('success', `Generated ${results.test_cases.length} test cases from ${filteredRequirements.length} selected requirements!`);
       
     } catch (error) {
       console.error('Test case generation error:', error);
       actions.addError('Failed to generate test cases. Please try again.');
-      setCurrentStep('configure');
+      setCurrentStep('select');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleEditTestCase = (testCase) => {
-    // TODO: Implement test case editing modal
-    console.log('Edit test case:', testCase);
-    actions.addNotification('info', 'Test case editor will open here');
+    setEditingTestCase(testCase);
+    setShowEditModal(true);
   };
 
   const handleViewTestCase = (testCase) => {
-    // TODO: Implement test case viewing modal
-    console.log('View test case:', testCase);
-    actions.addNotification('info', 'Test case details will be shown here');
+    // For now, just open in edit mode as read-only
+    setEditingTestCase(testCase);
+    setShowEditModal(true);
   };
 
   const handleAddTestCase = () => {
-    // TODO: Implement add test case modal
-    console.log('Add new test case');
-    actions.addNotification('info', 'Add test case form will open here');
+    setEditingTestCase(null);
+    setShowEditModal(true);
   };
 
-  const handleExecuteTestCase = (testCase) => {
-    // TODO: Implement test case execution
-    console.log('Execute test case:', testCase);
-    actions.addNotification('info', 'Test execution will be implemented');
+  const handleDeleteTestCase = (testCase) => {
+    if (window.confirm(`Are you sure you want to delete test case "${testCase.title}"?`)) {
+      const updatedTestCases = phaseData.testCases.filter(tc => tc.id !== testCase.id);
+      
+      // Update statistics
+      const statistics = {
+        total: updatedTestCases.length,
+        byPriority: {
+          high: updatedTestCases.filter(tc => tc.priority === 'high').length,
+          medium: updatedTestCases.filter(tc => tc.priority === 'medium').length,
+          low: updatedTestCases.filter(tc => tc.priority === 'low').length
+        },
+        byType: {
+          positive: updatedTestCases.filter(tc => tc.type === 'positive').length,
+          negative: updatedTestCases.filter(tc => tc.type === 'negative').length,
+          boundary: updatedTestCases.filter(tc => tc.type === 'boundary').length
+        }
+      };
+
+      actions.updatePhaseData('testcases', {
+        ...phaseData,
+        testCases: updatedTestCases,
+        statistics
+      });
+
+      actions.addNotification('success', 'Test case deleted successfully');
+    }
+  };
+
+  const handleSaveTestCase = (testCaseData) => {
+    const updatedTestCases = [...phaseData.testCases];
+    
+    if (editingTestCase) {
+      // Update existing test case
+      const index = updatedTestCases.findIndex(tc => tc.id === editingTestCase.id);
+      if (index !== -1) {
+        updatedTestCases[index] = { ...testCaseData };
+        actions.addNotification('success', 'Test case updated successfully');
+      }
+    } else {
+      // Add new test case
+      const newId = `TC-${String(updatedTestCases.length + 1).padStart(3, '0')}`;
+      updatedTestCases.push({ 
+        ...testCaseData, 
+        id: testCaseData.id || newId 
+      });
+      actions.addNotification('success', 'Test case added successfully');
+    }
+
+    // Update statistics
+    const statistics = {
+      total: updatedTestCases.length,
+      byPriority: {
+        high: updatedTestCases.filter(tc => tc.priority === 'high').length,
+        medium: updatedTestCases.filter(tc => tc.priority === 'medium').length,
+        low: updatedTestCases.filter(tc => tc.priority === 'low').length
+      },
+      byType: {
+        positive: updatedTestCases.filter(tc => tc.type === 'positive').length,
+        negative: updatedTestCases.filter(tc => tc.type === 'negative').length,
+        boundary: updatedTestCases.filter(tc => tc.type === 'boundary').length
+      }
+    };
+
+    actions.updatePhaseData('testcases', {
+      ...phaseData,
+      testCases: updatedTestCases,
+      statistics
+    });
+
+    setShowEditModal(false);
+    setEditingTestCase(null);
   };
 
   const handleBulkAction = (action, selectedIds) => {
-    console.log('Bulk action:', action, selectedIds);
-    actions.addNotification('success', `Bulk ${action} applied to ${selectedIds.length} test cases`);
+    const updatedTestCases = [...phaseData.testCases];
+    
+    if (action === 'delete') {
+      if (window.confirm(`Are you sure you want to delete ${selectedIds.length} test cases?`)) {
+        const filteredTestCases = updatedTestCases.filter(tc => !selectedIds.includes(tc.id));
+        
+        // Update statistics
+        const statistics = {
+          total: filteredTestCases.length,
+          byPriority: {
+            high: filteredTestCases.filter(tc => tc.priority === 'high').length,
+            medium: filteredTestCases.filter(tc => tc.priority === 'medium').length,
+            low: filteredTestCases.filter(tc => tc.priority === 'low').length
+          },
+          byType: {
+            positive: filteredTestCases.filter(tc => tc.type === 'positive').length,
+            negative: filteredTestCases.filter(tc => tc.type === 'negative').length,
+            boundary: filteredTestCases.filter(tc => tc.type === 'boundary').length
+          }
+        };
+
+        actions.updatePhaseData('testcases', {
+          ...phaseData,
+          testCases: filteredTestCases,
+          statistics
+        });
+
+        actions.addNotification('success', `${selectedIds.length} test cases deleted successfully`);
+      }
+    } else {
+      actions.addNotification('success', `Bulk ${action} applied to ${selectedIds.length} test cases`);
+    }
   };
 
-  const handleExportTestCases = () => {
-    if (!phaseData.testCases || phaseData.testCases.length === 0) return;
+  const handleExportTestCases = async (format) => {
+    if (!phaseData.testCases || phaseData.testCases.length === 0) {
+      actions.addError('No test cases to export');
+      return;
+    }
 
-    // Create exportable content
-    const content = {
-      title: 'Test Cases Suite',
-      generated_date: new Date().toISOString(),
-      statistics: phaseData.statistics,
-      test_cases: phaseData.testCases,
-      configuration: phaseData.configuration,
-      recommendations: phaseData.recommendations
-    };
+    setShowExportDropdown(false);
+    const projectName = phaseData.configuration?.projectName || 'STLC Project';
+    
+    try {
+      let result;
+      switch (format) {
+        case 'excel':
+          result = await exportService.exportTestCasesToExcel(phaseData, projectName);
+          break;
+        case 'azure':
+          result = exportService.exportTestCasesToAzureCSV(phaseData, projectName);
+          break;
+        case 'testlink':
+          result = exportService.exportTestCasesToTestLinkCSV(phaseData, projectName);
+          break;
+        case 'zephyr':
+          result = exportService.exportTestCasesToZephyrCSV(phaseData, projectName);
+          break;
+        default:
+          result = { success: false, error: 'Unknown format' };
+      }
 
-    const dataStr = JSON.stringify(content, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `test-cases-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-
-    actions.addNotification('success', 'Test cases exported successfully!');
+      if (result.success) {
+        actions.addNotification('success', `Test cases exported to ${format.toUpperCase()} successfully!`);
+      } else {
+        actions.addError(`Failed to export to ${format}: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      actions.addError(`Export failed: ${error.message}`);
+    }
   };
 
   const handleCompletePhase = () => {
@@ -146,6 +281,27 @@ const Phase3 = () => {
 
   const handleBackToConfiguration = () => {
     setCurrentStep('configure');
+  };
+
+  const handleBackToSelection = () => {
+    setCurrentStep('select');
+  };
+
+  const handleToggleRequirement = (reqId) => {
+    setSelectedRequirements(prev => 
+      prev.includes(reqId) 
+        ? prev.filter(id => id !== reqId)
+        : [...prev, reqId]
+    );
+  };
+
+  const handleToggleAll = () => {
+    const allReqIds = requirementsData.requirements?.map(req => req.id) || [];
+    if (selectedRequirements.length === allReqIds.length) {
+      setSelectedRequirements([]);
+    } else {
+      setSelectedRequirements(allReqIds);
+    }
   };
 
   const renderConfigureStep = () => (
@@ -194,6 +350,118 @@ const Phase3 = () => {
     </div>
   );
 
+  const renderSelectStep = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <CheckCircle className="w-16 h-16 text-primary-600 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Select Requirements</h2>
+        <p className="text-gray-600">
+          Choose which requirements to include in test case generation
+        </p>
+      </div>
+
+      {/* Selection Summary */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            Requirements Selection ({selectedRequirements.length} of {requirementsData.requirements?.length || 0} selected)
+          </h3>
+          <button
+            onClick={handleToggleAll}
+            className="btn-secondary text-sm"
+          >
+            {selectedRequirements.length === (requirementsData.requirements?.length || 0) ? 'Deselect All' : 'Select All'}
+          </button>
+        </div>
+        
+        {/* Requirements List */}
+        {requirementsData.requirements && requirementsData.requirements.length > 0 ? (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {requirementsData.requirements.map((req) => (
+              <div 
+                key={req.id}
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  selectedRequirements.includes(req.id)
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => handleToggleRequirement(req.id)}
+              >
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedRequirements.includes(req.id)}
+                    onChange={() => handleToggleRequirement(req.id)}
+                    className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-900 truncate">
+                        {req.title}
+                      </h4>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          req.type === 'functional' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {req.type}
+                        </span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          req.priority === 'high' 
+                            ? 'bg-red-100 text-red-800'
+                            : req.priority === 'medium'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {req.priority}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {req.description}
+                    </p>
+                    {req.category && (
+                      <div className="mt-1">
+                        <span className="text-xs text-gray-500">Category: {req.category}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p>No requirements available</p>
+            <p className="text-sm">Complete Phase 1 to analyze requirements first</p>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-between items-center pt-6">
+        <button
+          onClick={handleBackToConfiguration}
+          className="btn-secondary flex items-center space-x-2"
+        >
+          <ChevronDown className="w-4 h-4 rotate-90" />
+          <span>Back to Configuration</span>
+        </button>
+        
+        <button
+          onClick={handleRequirementSelection}
+          disabled={selectedRequirements.length === 0}
+          className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <TestTube className="w-4 h-4" />
+          <span>Generate Test Cases ({selectedRequirements.length} requirements)</span>
+        </button>
+      </div>
+    </div>
+  );
+
   const renderGenerateStep = () => (
     <div className="text-center py-12">
       <LoadingSpinner size="large" message="AI is generating your test cases..." />
@@ -212,11 +480,11 @@ const Phase3 = () => {
       {/* Navigation and Summary */}
       <div className="flex items-center justify-between">
         <button
-          onClick={handleBackToConfiguration}
+          onClick={handleBackToSelection}
           className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Configuration</span>
+          <span>Back to Selection</span>
         </button>
         
         <div className="flex space-x-2">
@@ -296,7 +564,7 @@ const Phase3 = () => {
           onEdit={handleEditTestCase}
           onView={handleViewTestCase}
           onAdd={handleAddTestCase}
-          onExecute={handleExecuteTestCase}
+          onDelete={handleDeleteTestCase}
           onBulkAction={handleBulkAction}
         />
       )}
@@ -304,13 +572,51 @@ const Phase3 = () => {
       {/* Action Buttons */}
       <div className="flex justify-between items-center pt-6">
         <div className="flex space-x-4">
-          <button
-            onClick={handleExportTestCases}
-            className="btn-secondary flex items-center space-x-2"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export Test Suite</span>
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              className="btn-secondary flex items-center space-x-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export Test Cases</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute bottom-full mb-2 left-0 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                <div className="py-1">
+                  <button
+                    onClick={() => handleExportTestCases('excel')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportTestCases('azure')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>CSV Azure Test Plans</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportTestCases('testlink')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>CSV TestLink</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportTestCases('zephyr')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>CSV Zephyr Jira</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
         <button
@@ -336,16 +642,22 @@ const Phase3 = () => {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Progress Steps */}
       <div className="mb-8">
-        <div className="flex items-center justify-center space-x-8">
+        <div className="flex items-center justify-center space-x-4">
           {[
             { id: 'configure', name: 'Configure', icon: TestTube },
+            { id: 'select', name: 'Select', icon: CheckCircle },
             { id: 'generate', name: 'Generate', icon: Brain },
             { id: 'manage', name: 'Manage', icon: TableProperties }
           ].map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
-            const isCompleted = (currentStep === 'manage' && step.id !== 'manage') || 
-                             (currentStep === 'generate' && step.id === 'configure');
+            const getStepStatus = (stepId) => {
+              const stepOrder = ['configure', 'select', 'generate', 'manage'];
+              const currentIndex = stepOrder.indexOf(currentStep);
+              const stepIndex = stepOrder.indexOf(stepId);
+              return stepIndex < currentIndex;
+            };
+            const isCompleted = getStepStatus(step.id);
             
             return (
               <div key={step.id} className="flex items-center">
@@ -358,12 +670,12 @@ const Phase3 = () => {
                 }`}>
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className={`ml-2 font-medium ${
+                <span className={`ml-2 font-medium text-sm ${
                   isActive ? 'text-primary-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
                 }`}>
                   {step.name}
                 </span>
-                {index < 2 && <div className="w-8 h-0.5 bg-gray-300 mx-4" />}
+                {index < 3 && <div className="w-4 h-0.5 bg-gray-300 mx-2" />}
               </div>
             );
           })}
@@ -372,7 +684,19 @@ const Phase3 = () => {
 
       {/* Step Content */}
       {currentStep === 'configure' && renderConfigureStep()}
+      {currentStep === 'select' && renderSelectStep()}
       {currentStep === 'manage' && renderManageStep()}
+
+      {/* Edit Modal */}
+      <TestCaseEditModal
+        isOpen={showEditModal}
+        testCase={editingTestCase}
+        onSave={handleSaveTestCase}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingTestCase(null);
+        }}
+      />
     </div>
   );
 };

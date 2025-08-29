@@ -38,10 +38,10 @@ const PlanningWizard = ({ onComplete, existingData = {} }) => {
   });
 
   const steps = [
-    { title: 'Basic Information', description: 'Project details and objectives' },
-    { title: 'Scope & Types', description: 'Testing scope and test types' },
-    { title: 'Resources & Environment', description: 'Team and infrastructure' },
-    { title: 'Risks & Success Criteria', description: 'Risk assessment and goals' }
+    { title: 'Basic Info', fullTitle: 'Basic Information', description: 'Project details and objectives' },
+    { title: 'Scope & Types', fullTitle: 'Scope & Types', description: 'Testing scope and test types' },
+    { title: 'Resources', fullTitle: 'Resources & Environment', description: 'Team and infrastructure' },
+    { title: 'Success Criteria', fullTitle: 'Risks & Success Criteria', description: 'Risk assessment and goals' }
   ];
 
   const updateFormData = (field, value) => {
@@ -339,8 +339,8 @@ const PlanningWizard = ({ onComplete, existingData = {} }) => {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {steps.map((step, index) => (
-            <div key={index} className="flex items-center flex-1">
-              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium ${
+            <div key={index} className="flex items-center flex-1 min-w-0">
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-medium shrink-0 ${
                 index === currentStep
                   ? 'border-primary-600 bg-primary-600 text-white'
                   : index < currentStep
@@ -349,28 +349,38 @@ const PlanningWizard = ({ onComplete, existingData = {} }) => {
               }`}>
                 {index < currentStep ? <CheckCircle className="w-5 h-5" /> : index + 1}
               </div>
-              <div className="ml-3 flex-1">
-                <p className={`text-sm font-medium ${
+              <div className="ml-2 flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${
                   index === currentStep ? 'text-primary-600' : index < currentStep ? 'text-green-600' : 'text-gray-500'
                 }`}>
                   {step.title}
                 </p>
-                <p className="text-xs text-gray-500">{step.description}</p>
+                <p className="text-xs text-gray-500 truncate hidden sm:block">{step.description}</p>
               </div>
               {index < steps.length - 1 && (
-                <div className={`w-full h-0.5 mx-4 ${
+                <div className={`hidden md:block w-8 lg:w-12 h-0.5 mx-2 ${
                   index < currentStep ? 'bg-green-600' : 'bg-gray-300'
                 }`} />
               )}
             </div>
           ))}
         </div>
+        
+        {/* Mobile step indicator */}
+        <div className="md:hidden mt-4 text-center">
+          <div className="text-sm text-gray-600">
+            Step {currentStep + 1} of {steps.length}
+          </div>
+          <div className="text-base font-medium text-gray-900 mt-1">
+            {steps[currentStep].fullTitle}
+          </div>
+        </div>
       </div>
 
       {/* Step Content */}
       <div className="card min-h-96">
         <h2 className="text-xl font-bold text-gray-900 mb-6">
-          {steps[currentStep].title}
+          {steps[currentStep].fullTitle}
         </h2>
         
         {currentStep === 0 && renderStep1()}

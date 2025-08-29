@@ -4,6 +4,7 @@ import aiService from '../../services/aiService';
 import PlanningWizard from './PlanningWizard';
 import TestPlanViewer from './TestPlanViewer';
 import LoadingSpinner from '../common/LoadingSpinner';
+import Stepper from '../common/Stepper';
 import { 
   Clipboard, 
   Brain, 
@@ -200,49 +201,31 @@ const Phase2 = () => {
   );
 
   if (isGenerating) {
-    return (
-      <div className="p-6 max-w-7xl mx-auto">
-        {renderGenerateStep()}
-      </div>
-    );
+    return renderGenerateStep();
   }
 
+  const stepperSteps = [
+    { id: 'configure', name: 'Configure', icon: Clipboard, description: 'Set up test planning parameters' },
+    { id: 'generate', name: 'Generate', icon: Brain, description: 'AI creates comprehensive test plan' },
+    { id: 'review', name: 'Review', icon: Eye, description: 'Review and approve generated plan' }
+  ];
+
+  const handleStepClick = (stepId) => {
+    if (stepId === 'configure' && (currentStep === 'review' || currentStep === 'generate')) {
+      handleBackToWizard();
+    }
+  };
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Progress Steps */}
+    <div>
+      {/* Enhanced Progress Steps */}
       <div className="mb-8">
-        <div className="flex items-center justify-center space-x-8">
-          {[
-            { id: 'configure', name: 'Configure', icon: Clipboard },
-            { id: 'generate', name: 'Generate', icon: Brain },
-            { id: 'review', name: 'Review', icon: Eye }
-          ].map((step, index) => {
-            const Icon = step.icon;
-            const isActive = currentStep === step.id;
-            const isCompleted = (currentStep === 'review' && step.id !== 'review') || 
-                             (currentStep === 'generate' && step.id === 'configure');
-            
-            return (
-              <div key={step.id} className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  isActive 
-                    ? 'border-primary-600 bg-primary-600 text-white'
-                    : isCompleted 
-                    ? 'border-green-600 bg-green-600 text-white'
-                    : 'border-gray-300 bg-white text-gray-400'
-                }`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <span className={`ml-2 font-medium ${
-                  isActive ? 'text-primary-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
-                }`}>
-                  {step.name}
-                </span>
-                {index < 2 && <div className="w-8 h-0.5 bg-gray-300 mx-4" />}
-              </div>
-            );
-          })}
-        </div>
+        <Stepper 
+          steps={stepperSteps}
+          currentStep={currentStep}
+          onStepClick={handleStepClick}
+          allowNonLinear={false}
+        />
       </div>
 
       {/* Step Content */}

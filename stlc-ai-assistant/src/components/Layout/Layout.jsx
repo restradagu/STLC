@@ -1,6 +1,7 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import Breadcrumb from '../common/Breadcrumb';
 
 const Layout = ({ children, currentPhase, onPhaseChange, projectData }) => {
   return (
@@ -16,7 +17,13 @@ const Layout = ({ children, currentPhase, onPhaseChange, projectData }) => {
           projectData={projectData}
         />
         <main className="flex-1 overflow-auto">
-          {children}
+          <div className="p-6 max-w-7xl mx-auto">
+            <Breadcrumb 
+              currentPhase={currentPhase}
+              projectData={projectData}
+            />
+            {children}
+          </div>
         </main>
       </div>
     </div>

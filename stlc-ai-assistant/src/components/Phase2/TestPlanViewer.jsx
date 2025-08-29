@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Eye, 
   Edit3, 
@@ -13,9 +13,13 @@ import {
   Settings,
   CheckCircle
 } from 'lucide-react';
+import exportService from '../../services/exportService';
+import { useApp } from '../../context/AppContext';
 
 const TestPlanViewer = ({ testPlan, onEdit, onExport, onApprove }) => {
+  const { actions } = useApp();
   const [activeTab, setActiveTab] = useState('preview');
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     objective: true,
     scope: true,
@@ -26,12 +30,55 @@ const TestPlanViewer = ({ testPlan, onEdit, onExport, onApprove }) => {
     tools: false,
     deliverables: false
   });
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowExportDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleExport = async (format) => {
+    setShowExportDropdown(false);
+    const projectName = testPlan.project_name || 'STLC Project';
+    
+    try {
+      let result;
+      switch (format) {
+        case 'pdf':
+          result = exportService.exportTestPlanToPDF(testPlan, projectName);
+          break;
+        case 'word':
+          result = await exportService.exportTestPlanToWord(testPlan, projectName);
+          break;
+        case 'txt':
+          result = exportService.exportTestPlanToTxt(testPlan, projectName);
+          break;
+        default:
+          result = { success: false, error: 'Unknown format' };
+      }
+
+      if (result.success) {
+        actions.addNotification('success', `Test plan exported to ${format.toUpperCase()} successfully!`);
+      } else {
+        actions.addError(`Failed to export to ${format.toUpperCase()}: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      actions.addError(`Export failed: ${error.message}`);
+    }
   };
 
   const renderSection = (title, content, icon, sectionKey) => {
@@ -270,13 +317,45 @@ const TestPlanViewer = ({ testPlan, onEdit, onExport, onApprove }) => {
         </div>
         
         <div className="flex space-x-3">
-          <button
-            onClick={onExport}
-            className="btn-secondary flex items-center space-x-2"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export</span>
-          </button>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              className="btn-secondary flex items-center space-x-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export</span>
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
+                <div className="py-1">
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>PDF Format</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('word')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Word (.docx)</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('txt')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Text (.txt)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          
           <button
             onClick={onApprove}
             className="btn-primary flex items-center space-x-2"

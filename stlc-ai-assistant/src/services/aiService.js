@@ -266,6 +266,121 @@ Return only valid JSON without any markdown formatting.`;
     return analysis;
   },
 
+  // Static Requirements Validation
+  async validateRequirements(requirements) {
+    try {
+      const config = getAzureConfig();
+      if (config) {
+        const prompt = `You are a requirements validation expert. Perform static analysis on the following requirements to detect formal errors, ambiguities, contradictions, and gaps in JSON format.
+
+Requirements to validate:
+${JSON.stringify(requirements, null, 2)}
+
+Please provide comprehensive validation including:
+1. overall_score (0-100 representing overall quality score)
+2. summary (object with total_issues, critical_issues, warnings, suggestions)
+3. findings (array of finding objects with: id, type [error|warning|suggestion], category [formal_error|ambiguity|contradiction|gap|enhancement], title, description, severity [critical|high|medium|low], requirement_id, suggestions array)
+
+Analysis focus areas:
+- Formal structure and completeness
+- Clarity and unambiguous language
+- Consistency across requirements
+- Missing information or gaps
+- Testability and measurability
+- Dependencies and conflicts
+
+Return only valid JSON without any markdown formatting.`;
+
+        const messages = [
+          { role: 'system', content: 'You are an expert requirements validation specialist. Provide detailed static analysis in JSON format only.' },
+          { role: 'user', content: prompt }
+        ];
+
+        const response = await callAzureOpenAI(messages, 3000);
+        console.log('Azure OpenAI requirements validation response received');
+        
+        try {
+          return JSON.parse(response);
+        } catch (parseError) {
+          console.error('Error parsing validation response, falling back to mock:', parseError);
+          throw new Error('Parse error');
+        }
+      }
+    } catch (error) {
+      console.log('Azure OpenAI validation failed, using mock data:', error.message);
+    }
+
+    // Fallback to mock validation data
+    await delay(1500);
+    
+    const mockFindings = [
+      {
+        id: 'VAL-001',
+        type: 'error',
+        category: 'ambiguity',
+        title: 'Ambiguous terminology in authentication requirement',
+        description: 'The term "secure authentication" is too vague and needs specific security standards defined.',
+        severity: 'high',
+        requirement_id: requirements.find(r => r.title.toLowerCase().includes('auth'))?.id || 'REQ-001',
+        suggestions: [
+          'Specify authentication methods (e.g., OAuth 2.0, JWT tokens)',
+          'Define password complexity requirements',
+          'Clarify session management policies'
+        ]
+      },
+      {
+        id: 'VAL-002',
+        type: 'warning',
+        category: 'gap',
+        title: 'Missing error handling specifications',
+        description: 'Most requirements lack specific error handling and edge case definitions.',
+        severity: 'medium',
+        requirement_id: null,
+        suggestions: [
+          'Add error scenarios for each functional requirement',
+          'Define system behavior during failures',
+          'Specify user feedback mechanisms for errors'
+        ]
+      },
+      {
+        id: 'VAL-003',
+        type: 'suggestion',
+        category: 'enhancement',
+        title: 'Consider adding performance metrics',
+        description: 'Requirements would benefit from specific performance criteria and measurement methods.',
+        severity: 'low',
+        requirement_id: null,
+        suggestions: [
+          'Add response time requirements',
+          'Define throughput expectations',
+          'Specify resource utilization limits'
+        ]
+      }
+    ];
+
+    const totalIssues = mockFindings.length;
+    const criticalIssues = mockFindings.filter(f => f.severity === 'critical').length;
+    const warnings = mockFindings.filter(f => f.type === 'warning').length;
+    const suggestions = mockFindings.filter(f => f.type === 'suggestion').length;
+
+    // Calculate score based on findings
+    const baseScore = 85;
+    const penaltyPerCritical = 15;
+    const penaltyPerWarning = 5;
+    const overallScore = Math.max(0, baseScore - (criticalIssues * penaltyPerCritical) - (warnings * penaltyPerWarning));
+
+    return {
+      overall_score: overallScore,
+      summary: {
+        total_issues: totalIssues,
+        critical_issues: criticalIssues,
+        warnings: warnings,
+        suggestions: suggestions
+      },
+      findings: mockFindings
+    };
+  },
+
   async validateRequirement(requirement) {
     try {
       const config = getAzureConfig();

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bell, Settings, User, Download } from 'lucide-react';
 import AzureConfigModal from '../common/AzureConfigModal';
+import Tooltip from '../common/Tooltip';
 
 const Header = ({ currentPhase, projectData }) => {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
@@ -49,22 +50,29 @@ const Header = ({ currentPhase, projectData }) => {
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-2">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Download className="w-5 h-5 text-gray-600" />
-            </button>
-            <button 
-              onClick={() => setIsConfigModalOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Azure OpenAI Configuration"
-            >
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <User className="w-5 h-5 text-gray-600" />
-            </button>
+            <Tooltip content="Notifications" position="bottom">
+              <button className="p-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none rounded-lg transition-colors">
+                <Bell className="w-5 h-5 text-gray-600" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Export project data" position="bottom">
+              <button className="p-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none rounded-lg transition-colors">
+                <Download className="w-5 h-5 text-gray-600" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Azure OpenAI Configuration" position="bottom">
+              <button 
+                onClick={() => setIsConfigModalOpen(true)}
+                className="p-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none rounded-lg transition-colors"
+              >
+                <Settings className="w-5 h-5 text-gray-600" />
+              </button>
+            </Tooltip>
+            <Tooltip content="User profile" position="bottom">
+              <button className="p-2 hover:bg-gray-100 focus:bg-gray-100 focus:outline-none rounded-lg transition-colors">
+                <User className="w-5 h-5 text-gray-600" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

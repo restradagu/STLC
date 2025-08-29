@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import Tooltip from '../common/Tooltip';
 import { 
   Search, 
   Filter, 
   Edit, 
   Eye, 
-  Play, 
+  Trash2, 
   Plus,
   MoreHorizontal,
   CheckCircle,
@@ -17,9 +18,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkAction }) => {
+const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onDelete, onBulkAction }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [sortField, setSortField] = useState('id');
@@ -33,11 +33,10 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
                          tc.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          tc.id.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesStatus = filterStatus === 'all' || tc.status === filterStatus;
     const matchesPriority = filterPriority === 'all' || tc.priority === filterPriority;
     const matchesType = filterType === 'all' || tc.type === filterType;
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesType;
+    return matchesSearch && matchesPriority && matchesType;
   });
 
   // Sort test cases
@@ -104,18 +103,6 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
     return colors[priority] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'review':
-        return <Clock className="w-4 h-4 text-yellow-600" />;
-      case 'draft':
-        return <Circle className="w-4 h-4 text-gray-400" />;
-      default:
-        return <Circle className="w-4 h-4 text-gray-400" />;
-    }
-  };
 
   const getTypeColor = (type) => {
     const colors = {
@@ -163,10 +150,10 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
                 Bulk Approve
               </button>
               <button
-                onClick={() => onBulkAction('execute', selectedItems)}
-                className="btn-secondary text-sm"
+                onClick={() => onBulkAction('delete', selectedItems)}
+                className="btn-secondary text-sm text-red-600 hover:text-red-800"
               >
-                Bulk Execute
+                Bulk Delete
               </button>
             </div>
           )}
@@ -187,46 +174,42 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
           <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search test cases..."
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="Search test cases by title, description, or ID..."
+            className="input-field pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search test cases"
           />
         </div>
 
-        {/* Filters */}
-        <select
-          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-        >
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option>
-          <option value="review">Review</option>
-          <option value="approved">Approved</option>
-        </select>
 
-        <select
-          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          value={filterPriority}
-          onChange={(e) => setFilterPriority(e.target.value)}
-        >
-          <option value="all">All Priorities</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        <Tooltip content="Filter by priority level" position="bottom">
+          <select
+            className="input-field"
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            aria-label="Filter by priority"
+          >
+            <option value="all">All Priorities</option>
+            <option value="high">High Priority</option>
+            <option value="medium">Medium Priority</option>
+            <option value="low">Low Priority</option>
+          </select>
+        </Tooltip>
 
-        <select
-          className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-        >
-          <option value="all">All Types</option>
-          <option value="positive">Positive</option>
-          <option value="negative">Negative</option>
-          <option value="boundary">Boundary</option>
-        </select>
+        <Tooltip content="Filter by test case type" position="bottom">
+          <select
+            className="input-field"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            aria-label="Filter by test type"
+          >
+            <option value="all">All Types</option>
+            <option value="positive">Positive Tests</option>
+            <option value="negative">Negative Tests</option>
+            <option value="boundary">Boundary Tests</option>
+          </select>
+        </Tooltip>
       </div>
 
       {/* Table */}
@@ -271,12 +254,6 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
                   <span>Priority</span>
                   <ArrowUpDown className="w-4 h-4" />
                 </button>
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Time
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -328,38 +305,35 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
                       {testCase.priority}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(testCase.status)}
-                      <span className="text-sm text-gray-900 capitalize">{testCase.status}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {testCase.estimated_time}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => onView(testCase)}
-                        className="text-primary-600 hover:text-primary-900 p-1 hover:bg-primary-50 rounded"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onEdit(testCase)}
-                        className="text-gray-600 hover:text-gray-900 p-1 hover:bg-gray-100 rounded"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onExecute(testCase)}
-                        className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
-                        title="Execute"
-                      >
-                        <Play className="w-4 h-4" />
-                      </button>
+                      <Tooltip content="View test case details" position="top">
+                        <button
+                          onClick={() => onView(testCase)}
+                          className="text-primary-600 hover:text-primary-900 focus:bg-primary-50 focus:outline-none p-1 hover:bg-primary-50 rounded transition-colors"
+                          aria-label={`View ${testCase.title}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
+                      <Tooltip content="Edit test case" position="top">
+                        <button
+                          onClick={() => onEdit(testCase)}
+                          className="text-gray-600 hover:text-gray-900 focus:bg-gray-100 focus:outline-none p-1 hover:bg-gray-100 rounded transition-colors"
+                          aria-label={`Edit ${testCase.title}`}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
+                      <Tooltip content="Delete test case" position="top">
+                        <button
+                          onClick={() => onDelete(testCase)}
+                          className="text-red-600 hover:text-red-900 focus:bg-red-50 focus:outline-none p-1 hover:bg-red-50 rounded transition-colors"
+                          aria-label={`Delete ${testCase.title}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </Tooltip>
                     </div>
                   </td>
                 </tr>
@@ -367,7 +341,7 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
                 {/* Expanded Row */}
                 {expandedRows.has(testCase.id) && (
                   <tr>
-                    <td colSpan="8" className="px-6 py-4 bg-gray-50">
+                    <td colSpan="6" className="px-6 py-4 bg-gray-50">
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -421,10 +395,10 @@ const TestCaseTable = ({ testCases, onEdit, onView, onAdd, onExecute, onBulkActi
           <div className="text-sm text-gray-600">Total Test Cases</div>
         </div>
         <div className="bg-white p-4 rounded-lg border">
-          <div className="text-2xl font-bold text-green-600">
-            {testCases.filter(tc => tc.status === 'approved').length}
+          <div className="text-2xl font-bold text-yellow-600">
+            {testCases.filter(tc => tc.priority === 'medium').length}
           </div>
-          <div className="text-sm text-gray-600">Approved</div>
+          <div className="text-sm text-gray-600">Medium Priority</div>
         </div>
         <div className="bg-white p-4 rounded-lg border">
           <div className="text-2xl font-bold text-red-600">
