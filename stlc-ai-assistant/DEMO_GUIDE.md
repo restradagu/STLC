@@ -1,8 +1,5 @@
 # STLC AI Assistant - Guía de Demostración
 
-## 🎯 Objetivo de la Demo
-Impresionar a gerentes y líderes ejecutivos mostrando el poder transformador de la IA en el Software Testing Life Cycle.
-
 ## ⏱️ Script de 10 Minutos
 
 ### Apertura (1 minuto)
